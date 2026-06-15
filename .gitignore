@@ -1,0 +1,17 @@
+# ===== 敏感配置（含密钥，禁止上传）=====
+email_config.json
+push_config.json
+company_profile.json
+
+# ===== 真实数据 / 运行产物 =====
+inbox/
+reports/
+data/
+
+# ===== Python 缓存 =====
+__pycache__/
+*.pyc
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db

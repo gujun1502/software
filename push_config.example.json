@@ -1,0 +1,15 @@
+{
+  "enabled": false,
+  "service": "pushplus",
+  "token": "在此填入你的 pushplus token",
+  "sendkey": "",
+  "top_n": 8,
+  "_说明": {
+    "enabled": "填好token后改成 true 才会真正推送",
+    "service": "pushplus（推荐）或 serverchan（Server酱）",
+    "token": "service=pushplus时填：微信扫码登录 www.pushplus.plus 后，首页给你的那串token",
+    "sendkey": "service=serverchan时填：sct.ftqq.com 登录后拿到的SENDKEY",
+    "top_n": "微信摘要里列前几条重点商机",
+    "使用方法": "复制本文件为 push_config.json 并填入你自己的 token。push_config.json 已在 .gitignore 中，不会上传。"
+  }
+}

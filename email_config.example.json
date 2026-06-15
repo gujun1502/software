@@ -1,0 +1,15 @@
+{
+  "provider": "126",
+  "imap_server": "imap.126.com",
+  "imap_port": 993,
+  "email": "your_email@126.com",
+  "auth_code": "在此填入邮箱IMAP授权码",
+  "filter_keywords": ["采招网", "定制", "项目信息"],
+  "scan_recent": 30,
+  "_说明": {
+    "auth_code": "126邮箱设置→POP3/SMTP/IMAP→开启IMAP服务→按提示发短信验证→拿到的那串“授权码”。它只能收发邮件、可随时撤销，比主密码安全。",
+    "filter_keywords": "邮件主题或发件人里含这些词之一，才当作采招网商机邮件处理",
+    "scan_recent": "每次扫描收件箱里最近多少封邮件找采招网邮件",
+    "使用方法": "复制本文件为 email_config.json 并填入你自己的信息。email_config.json 已在 .gitignore 中，不会上传。"
+  }
+}
