@@ -2,6 +2,9 @@
 email_config.json
 push_config.json
 company_profile.json
+llm_config.json
+bidcenter_cookies.txt
+shcpe_cookies.txt
 
 # ===== 真实数据 / 运行产物 =====
 inbox/
@@ -11,6 +14,13 @@ data/
 # ===== Python 缓存 =====
 __pycache__/
 *.pyc
+
+# ===== PyInstaller 打包产物 / 分发包（含密钥与业务数据，禁止上传）=====
+build/
+dist/
+*.spec
+商机雷达_公司安装包/
+商机雷达_公司安装包.zip
 
 # ===== 系统文件 =====
 .DS_Store

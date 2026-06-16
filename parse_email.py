@@ -88,16 +88,31 @@ def parse_email_html(html):
     return projects
 
 
+def _date_from_filename(name):
+    """采招网邮件行内无日期，从文件名「您定制的06月11日…」推出标书发出日期(近似)。
+    年份取文件名开头的 20xx（收件日），无则留空。"""
+    ym = re.search(r"(20\d{2})", name)
+    md = re.search(r"(\d{1,2})月(\d{1,2})日", name)
+    if md:
+        year = ym.group(1) if ym else ""
+        if year:
+            return f"{year}-{int(md.group(1)):02d}-{int(md.group(2)):02d}"
+    return ""
+
+
 def parse_inbox(inbox_dir):
     """解析 inbox 下所有采招网邮件，按项目ID去重。"""
     seen, out = set(), []
     for fp in sorted(pathlib.Path(inbox_dir).glob("*.html")):
+        file_date = _date_from_filename(fp.name)
         for p in parse_email_html(fp.read_text(encoding="utf-8")):
             key = p["id"] or p["title"]
             if key in seen:
                 continue
             seen.add(key)
             p["来源邮件"] = fp.name
+            if not p.get("pub_date"):          # 行内无日期 → 用邮件主题日期近似
+                p["pub_date"] = file_date
             out.append(p)
     return out
 

@@ -2,7 +2,7 @@
 """把文字摘要推送到个人微信（PushPlus / Server酱）。发不了文件，只发文字/markdown。"""
 import json, pathlib, requests
 
-ROOT = pathlib.Path(__file__).resolve().parent
+from app_paths import ROOT  # 打包后指向 exe 目录
 _CFGP = ROOT / "push_config.json"
 
 

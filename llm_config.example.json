@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "base_url": "https://api.minimaxi.com/v1",
+  "api_key": "在此填你的大模型 API Key，并把本文件另存为 llm_config.json",
+  "model": "MiniMax-Text-01",
+  "_说明": "OpenAI 兼容接口，换厂商只改 base_url/model/api_key：MiniMax(国内)=https://api.minimaxi.com/v1 模型 MiniMax-Text-01；MiniMax(海外)=https://api.minimax.io/v1；DeepSeek=https://api.deepseek.com 模型 deepseek-chat；智谱GLM=https://open.bigmodel.cn/api/paas/v4 模型 glm-4-flash；通义千问=https://dashscope.aliyuncs.com/compatible-mode/v1 模型 qwen-plus。enabled=true 才启用，留 false 则只用正则。"
+}

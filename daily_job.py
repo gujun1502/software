@@ -6,7 +6,7 @@
 """
 import sys, pathlib, datetime, traceback
 
-ROOT = pathlib.Path(__file__).resolve().parent
+from app_paths import ROOT  # 打包后指向 exe 目录
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 MARKER = DATA / "last_run.txt"

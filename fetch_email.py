@@ -6,7 +6,7 @@
 import json, imaplib, email, pathlib, datetime, re
 from email.header import decode_header
 
-ROOT = pathlib.Path(__file__).resolve().parent
+from app_paths import ROOT  # 打包后指向 exe 目录
 INBOX = ROOT / "inbox"
 INBOX.mkdir(exist_ok=True)
 CFG = json.loads((ROOT / "email_config.json").read_text(encoding="utf-8"))

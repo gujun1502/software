@@ -2,7 +2,7 @@
 """markdown → 带中文样式HTML → 用系统 Chrome/Edge 无头打印 PDF。跨平台(Win/macOS/Linux)。
 用法: python md_to_pdf_edge.py input.md output.pdf [browser_path]
 不传 browser_path 时自动探测系统浏览器。"""
-import sys, subprocess, pathlib, urllib.parse, platform, shutil
+import os, sys, subprocess, pathlib, urllib.parse, platform, shutil, tempfile, time
 import markdown
 
 
@@ -36,6 +36,33 @@ def find_browser():
     return None
 
 
+def find_browsers():
+    """返回所有存在的浏览器路径（按优先级），用于失败时换一个重试。"""
+    sysname = platform.system()
+    if sysname == "Windows":
+        cands = [
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+    elif sysname == "Darwin":
+        cands = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+        ]
+    else:
+        cands = [shutil.which(n) for n in ("google-chrome", "chromium",
+                 "chromium-browser", "microsoft-edge", "msedge")]
+    out = []
+    for c in cands:
+        if c and pathlib.Path(c).exists() and c not in out:
+            out.append(c)
+    return out
+
+
 CSS = """
 @page { size: A4; margin: 1.8cm 1.6cm; }
 * { box-sizing: border-box; }
@@ -63,11 +90,32 @@ table, pre, blockquote { page-break-inside: avoid; }
 """
 
 
+def _try_print(browser, out_pdf, url):
+    """用一个浏览器把 url 打印到 out_pdf（全新临时文件）；写出非空文件返回 True。"""
+    try:
+        if out_pdf.exists():
+            out_pdf.unlink()
+    except Exception:
+        pass
+    try:
+        with tempfile.TemporaryDirectory(prefix="md2pdf_") as profile:
+            subprocess.run(
+                [browser, "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
+                 f"--user-data-dir={profile}", "--no-first-run", "--no-default-browser-check",
+                 f"--print-to-pdf={out_pdf}", url],
+                check=True, timeout=120,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        return False
+    return out_pdf.exists() and out_pdf.stat().st_size > 1000
+
+
 def convert(md_path, pdf_path, browser=None):
-    md_path, pdf_path = pathlib.Path(md_path), pathlib.Path(pdf_path)
-    browser = browser or find_browser()
-    if not browser or not pathlib.Path(browser).exists():
-        raise RuntimeError("未找到 Chrome/Edge 浏览器，无法生成PDF。请安装 Google Chrome。")
+    # 用绝对路径：headless 浏览器在独立 user-data-dir 下，相对路径可能解析到非预期目录而静默不写。
+    md_path, pdf_path = pathlib.Path(md_path).resolve(), pathlib.Path(pdf_path).resolve()
+    browsers = [browser] if browser else find_browsers()
+    if not browsers:
+        raise RuntimeError("未找到 Chrome/Edge 浏览器，无法生成PDF。请安装 Microsoft Edge 或 Google Chrome。")
     body = markdown.markdown(md_path.read_text(encoding="utf-8"),
                              extensions=["tables", "fenced_code", "toc", "sane_lists"])
     html = f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
@@ -75,9 +123,37 @@ def convert(md_path, pdf_path, browser=None):
     html_path = md_path.with_suffix(".html")
     html_path.write_text(html, encoding="utf-8")
     url = "file:///" + urllib.parse.quote(str(md_path.with_suffix(".html")).replace("\\", "/").lstrip("/"))
-    subprocess.run([browser, "--headless", "--disable-gpu", "--no-pdf-header-footer",
-                    f"--print-to-pdf={pdf_path}", url], check=True, timeout=120)
-    return pdf_path
+
+    # 关键：先打到全新的临时 PDF（绝不会被占用），成功后再落到目标名。
+    # 这样既绕开「无头实例静默失败」，也绕开「目标PDF正被阅读器打开锁住」。
+    tmp_pdf = pdf_path.with_name(pdf_path.stem + ".__building__.pdf")
+    ok, last = False, None
+    for b in browsers:
+        for _ in range(2):
+            if _try_print(b, tmp_pdf, url):
+                ok = True
+                break
+            last = b
+            time.sleep(1.0)
+        if ok:
+            break
+    if not ok:
+        raise RuntimeError(
+            f"浏览器未写出PDF（{len(browsers)}个浏览器各试2次仍失败，最后用 {last}）。"
+            f"常见原因：杀软拦截无头浏览器/磁盘只读。已保留 markdown 与 html。")
+
+    # 落到目标名；若目标被占用（PDF 正在阅读器里打开），改存带时间戳的新名字。
+    try:
+        os.replace(tmp_pdf, pdf_path)
+        return pdf_path
+    except Exception:
+        alt = pdf_path.with_name(pdf_path.stem + "_" + time.strftime("%H%M%S") + ".pdf")
+        try:
+            os.replace(tmp_pdf, alt)
+        except Exception:
+            return tmp_pdf      # 实在不行就返回临时文件本身
+        print(f"  (原PDF似乎正被打开/占用，已另存为 {alt.name})")
+        return alt
 
 
 if __name__ == "__main__":

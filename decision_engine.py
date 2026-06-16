@@ -9,7 +9,7 @@ Out Building Decision · 第二期 决策引擎
 """
 import json, pathlib, datetime
 
-ROOT = pathlib.Path(__file__).resolve().parent
+from app_paths import ROOT  # 打包后指向 exe 目录
 QUAL_RANK = {"无": 0, "丙级": 1, "乙级": 2, "甲级": 3}
 THIS_YEAR = 2026
 
