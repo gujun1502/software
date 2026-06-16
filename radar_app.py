@@ -8,6 +8,7 @@
   商机雷达.exe auto           每日自动全流程：进化(扩词/探源) + 全量刷新 + 出日报（定时任务用）
   商机雷达.exe update         全量刷新：收邮件 + 抓省级站/注册表源/采购意向 + 抓详情页(含大模型) + 出日报
   商机雷达.exe evolve [参数]   每日进化：用大模型发现新检索词 + 探测候选新源 + 记进化日志
+  商机雷达.exe enable-llm [模型] 把本地 Ollama 接入配置链（默认 qwen2.5:7b；无 Python 也能用）
   商机雷达.exe enrich [参数]   仅抓详情页增强（面积/造价/截标/关键词）
   商机雷达.exe cookies [参数]  采招网 Cookie 助手（自动读浏览器 / --paste / --test）
   商机雷达.exe email          仅收邮件
@@ -73,6 +74,11 @@ def main():
     elif cmd == "evolve":
         sys.argv = [argv0] + rest
         import evolve; evolve.main()
+
+    elif cmd in ("enable-llm", "enablellm"):
+        # 让没装 Python 的公司电脑也能把本地 Ollama 接入配置链（安装本地大模型.bat 调用）
+        sys.argv = [argv0] + rest
+        import enable_local_llm; enable_local_llm.main()
 
     elif cmd == "enrich":
         sys.argv = [argv0] + rest

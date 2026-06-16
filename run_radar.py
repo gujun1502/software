@@ -21,6 +21,39 @@ ENRICH_FILE = DATA / "详情增强.json"
 for d in (REPORTS, DATA):
     d.mkdir(exist_ok=True)
 
+# 时间窗：只砍掉「标书发出日期」太旧的，不设上限。
+# 保留条件 pub_date >= 今天-15天（含今天、也含查询日之后发出/截标的未来日期）；
+# 只有更早(早于 今天-15天)发出的才剔除。
+# 全部板块统一执行（可投商机/采购意向/竞争情报）。没抓到日期的条目保留。
+WINDOW_DAYS = 15
+WINDOW_START = datetime.date.today() - datetime.timedelta(days=WINDOW_DAYS)
+
+
+def _parse_pub_date(s):
+    """把 pub_date(形如 2026-06-11)解析成 date；解析不了返回 None。"""
+    s = (s or "").strip()
+    if not s:
+        return None
+    try:
+        return datetime.date.fromisoformat(s[:10])
+    except ValueError:
+        return None
+
+
+def in_window(p):
+    """标书发出日期是否落在「搜索日前 WINDOW_DAYS 天 ~ 今天」窗口内。
+    无日期(解析不出)的条目按保留处理，避免漏掉可能很新的商机。"""
+    d = _parse_pub_date(p.get("pub_date"))
+    if d is None:
+        return True
+    return d >= WINDOW_START
+
+
+def filter_window(projects):
+    """剔除发出日期早于窗口起点的项目，返回(保留列表, 剔除数)。"""
+    kept = [p for p in projects if in_window(p)]
+    return kept, len(projects) - len(kept)
+
 
 def attention(score):
     if score >= 55:
@@ -132,6 +165,11 @@ def build_report(scored, results, filtered, enrich=None, intentions=None):
     L.append("> ⚠️ 邮件只含标题/地区/类型；**资质·业绩·控制价等「废标级」要求需打开详情页确认**"
              "（你的采招网账号可看）。本表为契合度初筛排序，帮你定「先看哪几个」。")
     L.append("")
+    L.append(f"> 🕒 **时间窗（只砍太旧的，不设上限）**：只保留「标书发出日期」在 "
+             f"**{WINDOW_START.isoformat()} 当天及以后**的商机——含今天、也含查询日之后发出/截标的；"
+             f"只有更早（发出日期早于 {WINDOW_START.isoformat()}）的才一律不收录。"
+             "少数详情页未取到发出日期的条目按保留处理，请打开详情页核对发布时间。")
+    L.append("")
     L.append("> 🔎 **本期数据范围**：采招网定制邮件 + 江苏/安徽公共资源交易网抓取。"
              "检索「中国银行」仅命中：**武汉江夏支行**（已列入第1位）、**陕西省分行**"
              "（供应商选型入围，非设计已剔除）；**未发现「中国银行徐州分行」装修设计项目**——"
@@ -220,6 +258,11 @@ def main():
     projects = parse_email.parse_inbox(ROOT / "inbox")
     projects = load_scraped(projects)      # 合并本机抓取的省级站（安徽等）
     print(f"解析到 {len(projects)} 条项目")
+
+    # 时间窗过滤：只留「标书发出日期」在搜索日前 15 天以内的（更早的一律剔除）
+    projects, dropped = filter_window(projects)
+    print(f"时间窗筛选(发出日期 ≥ {WINDOW_START.isoformat()}，不设上限·含未来日期)："
+          f"剔除过旧 {dropped} 条，保留 {len(projects)} 条")
 
     bids_all = [p for p in projects if p["category"] in ("招标公告", "采购信息", "招标预告")]
     results_all = [p for p in projects if p["category"] in ("中标结果", "中标候选人")]

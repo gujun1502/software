@@ -10,6 +10,9 @@ python -m PyInstaller --onefile --console --name 商机雷达 --noconfirm ^
   --hidden-import lxml._elementpath ^
   --hidden-import win32crypt --hidden-import win32file ^
   --hidden-import cryptography.hazmat.primitives.ciphers.aead ^
+  --hidden-import evolve --hidden-import fetch_registry --hidden-import fetch_intention ^
+  --hidden-import fetch_jiangsu --hidden-import fetch_ahjyztb --hidden-import fetch_shcpe ^
+  --hidden-import keywords --hidden-import enable_local_llm --hidden-import enrich ^
   radar_app.py
 echo.
 echo 完成。exe 在  dist\商机雷达.exe

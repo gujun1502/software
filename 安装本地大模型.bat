@@ -44,7 +44,11 @@ echo.
 
 REM ---- 3) 生成 / 开启 llm_config.json ----
 echo [3/3] 配置 llm_config.json（把本地 Ollama 接入大模型链并启用）...
-python enable_local_llm.py qwen2.5:7b || echo   （若没装 Python：手动在 llm_config.json 的 providers 顶部加一条本地 Ollama，并把 enabled 改 true）
+if exist "商机雷达.exe" (
+  "商机雷达.exe" enable-llm qwen2.5:7b
+) else (
+  python enable_local_llm.py qwen2.5:7b || echo   （若没装 Python：手动在 llm_config.json 的 providers 顶部加一条本地 Ollama，并把 enabled 改 true）
+)
 echo.
 
 echo ============================================================
