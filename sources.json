@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "_说明": "信息源注册表。加一个省=加一行，不用写新爬虫。kind=epoint 走通用新点全文检索接口(fetch_registry.py)。status: verified=已验证可抓 / candidate=候选待探测(--probe 连通即转正) / disabled=停用。每日 evolve.py 会把探测成功的候选自动升为 verified。",
+  "sources": [
+    {
+      "id": "jsggzy",
+      "name": "江苏公共资源交易网",
+      "region": "江苏",
+      "kind": "epoint",
+      "home": "http://jsggzy.jszwfw.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "js",
+      "status": "verified"
+    },
+    {
+      "id": "sdggzy",
+      "name": "山东省公共资源交易中心",
+      "region": "山东",
+      "kind": "epoint",
+      "home": "http://ggzyjy.shandong.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "sd",
+      "status": "candidate"
+    },
+    {
+      "id": "jxsggzy",
+      "name": "江西省公共资源交易网",
+      "region": "江西",
+      "kind": "epoint",
+      "home": "http://www.jxsggzy.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "jx",
+      "status": "candidate"
+    },
+    {
+      "id": "gxggzy",
+      "name": "广西公共资源交易中心",
+      "region": "广西",
+      "kind": "epoint",
+      "home": "http://gxggzy.gxzf.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "gx",
+      "status": "candidate"
+    },
+    {
+      "id": "ynggzy",
+      "name": "云南省公共资源交易信息网",
+      "region": "云南",
+      "kind": "epoint",
+      "home": "http://ggzy.yn.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "yn",
+      "status": "candidate"
+    },
+    {
+      "id": "hbggzy",
+      "name": "河北省公共资源交易服务平台",
+      "region": "河北",
+      "kind": "epoint",
+      "home": "http://www.hebpr.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "hb",
+      "status": "candidate"
+    }
+  ]
+}

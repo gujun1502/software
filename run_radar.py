@@ -51,12 +51,13 @@ def field_of(p, key, enrich, title_fallback):
     return title_fallback
 
 
-def build_report(scored, results, filtered, enrich=None):
+def build_report(scored, results, filtered, enrich=None, intentions=None):
     enrich = enrich or {}
+    intentions = intentions or []
     enriched_n = sum(1 for p, _ in scored if (enrich.get(p.get("id") or "") or {}).get("ok"))
     L = [f"# 商机雷达决策日报 · {TODAY}", ""]
-    L.append(f"> **设计类**可投商机 **{len(scored)}** 条　|　竞争情报 {len(results)} 条　|　"
-             f"已剔除非设计类 {len(filtered)} 条　|　已抓详情页补全 {enriched_n} 条")
+    L.append(f"> **设计类**可投商机 **{len(scored)}** 条　|　采购意向(需求前置) {len(intentions)} 条　|　"
+             f"竞争情报 {len(results)} 条　|　已剔除非设计类 {len(filtered)} 条　|　已抓详情页补全 {enriched_n} 条")
     L.append("")
 
     # 一、可投商机排序：面积+控制价合并一格(上下排)，新增「标书发出/截标」一列
@@ -82,9 +83,29 @@ def build_report(scored, results, filtered, enrich=None):
                  f"| {p['region']} | {area_cost} | {time_cell} | {kw} | {link} |")
     L.append("")
 
-    # 二、竞争情报（同样标出 造价 / 关键词，方便看价格规律）
+    # 二、需求前置 · 采购意向公开（招标前几个月发布，最值钱的需求信号）
+    if intentions:
+        L.append("## 二、需求前置 · 采购意向公开")
+        L.append("")
+        L.append("> 这些是**招标前**发布的「谁要建/要改造什么」，比招标公告更早拿到，"
+                 "便于提前接触业主。`—` 表示该项未取到。")
+        L.append("")
+        L.append("| 关注度 | 契合度 | 业务 | 地区 | 预算/面积 | 关键词 | 项目 |")
+        L.append("|:--:|:--:|:--:|:--:|:--:|:--:|---|")
+        for p, d in intentions:
+            score = d["契合度"] if d["契合度"] is not None else 0
+            title = p["title"].replace("|", "／")
+            link = f"[{title}]({p['detail_url']})" if p.get("detail_url") else title
+            cost = field_of(p, "设计造价", enrich, extract_cost(p["title"]))
+            area = field_of(p, "设计面积", enrich, extract_area(p["title"]))
+            kw = field_of(p, "关键词", enrich, extract_keywords(p["title"]))
+            L.append(f"| {attention(score)} | {score} | {p['业务类型']} | {p['region']} "
+                     f"| {cost}<br>{area} | {kw} | {link} |")
+        L.append("")
+
+    # 三、竞争情报（同样标出 造价 / 关键词，方便看价格规律）
     if results:
-        L.append("## 二、竞争情报 · 近期同类中标结果")
+        L.append("## 三、竞争情报 · 近期同类中标结果")
         L.append("")
         L.append("> 这些是类似项目谁中了，用于判断对手与价格规律（第三期接入报价测算）。")
         L.append("")
@@ -98,8 +119,8 @@ def build_report(scored, results, filtered, enrich=None):
             L.append(f"| {p['region']} | {p['业务类型']} | {cost} | {kw} | {link} |")
         L.append("")
 
-    # 三、说明与关注事项（注释统一挪到最后，正文更清爽）
-    L.append("## 三、说明与关注事项")
+    # 四、说明与关注事项（注释统一挪到最后，正文更清爽）
+    L.append("## 四、说明与关注事项")
     L.append("")
     L.append("> 🎯 **只保留「室内/装饰装修设计」类**——装饰装修工程、施工、供应商、"
              "材料采购、维修、监理等均已自动剔除（贵司只做设计）。")
@@ -202,18 +223,24 @@ def main():
 
     bids_all = [p for p in projects if p["category"] in ("招标公告", "采购信息", "招标预告")]
     results_all = [p for p in projects if p["category"] in ("中标结果", "中标候选人")]
+    intent_all = [p for p in projects if p["category"] == "采购意向"]
 
     # 只保留"设计"类（贵司只做室内/装饰装修设计）
     bids = [p for p in bids_all if p["是否设计"]]
     filtered = [p for p in bids_all if not p["是否设计"]]      # 非设计，剔除供核对
     results = [p for p in results_all if p["是否设计"]]        # 竞争情报也只看设计类
+    intents = [p for p in intent_all if p["是否设计"]]         # 采购意向也只看设计类
 
-    scored = []
-    for p in bids:
-        proj = {"项目名称": p["title"], "项目类型": p["业务类型"], "业主": p["title"]}
-        d = DE.decide(proj, profile)
-        scored.append((p, d))
-    scored.sort(key=lambda x: -(x[1]["契合度"] or 0))
+    def score_all(items):
+        out = []
+        for p in items:
+            proj = {"项目名称": p["title"], "项目类型": p["业务类型"], "业主": p["title"]}
+            out.append((p, DE.decide(proj, profile)))
+        out.sort(key=lambda x: -(x[1]["契合度"] or 0))
+        return out
+
+    scored = score_all(bids)
+    scored_intent = score_all(intents)
 
     # 存竞争情报到历史中标库
     win_db = DATA / "历史中标.json"
@@ -225,15 +252,15 @@ def main():
     win_db.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
     enrich = load_enrichment()
-    md = build_report(scored, results, filtered, enrich)
+    md = build_report(scored, results, filtered, enrich, scored_intent)
     out = to_pdf(md)
     try:
         push_summary(scored, results, filtered)
     except Exception as e:
         print("  (微信推送出错，不影响报告:", e, ")")
     print(f"\n=== 完成 ===")
-    print(f"设计类可投商机 {len(scored)} 条｜竞争情报 {len(results)} 条｜"
-          f"已剔除非设计类 {len(filtered)} 条（累计中标入库 {len(existing)}）")
+    print(f"设计类可投商机 {len(scored)} 条｜采购意向 {len(scored_intent)} 条｜"
+          f"竞争情报 {len(results)} 条｜已剔除非设计类 {len(filtered)} 条（累计中标入库 {len(existing)}）")
     print(f"决策日报：{out}")
     if scored:
         print("\n契合度前5：")

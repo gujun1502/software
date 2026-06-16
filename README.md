@@ -43,9 +43,27 @@
   > 锁住 Cookies 文件**，需先退出浏览器；退不了或解不开就用 `--paste`（F12→Network→刷新→复制 Cookie 请求头）。
   > 注：采招网是纯前端渲染，即便带 cookie 也未必能抓到完整正文，这部分面积/造价可能仍需人工确认。
 
-**接国内大模型**：把 `llm_config.example.json` 复制为 `llm_config.json`，填 `api_key`、`enabled: true`。
-默认 DeepSeek（`deepseek-chat`）；换智谱 GLM / 通义千问只改 `base_url`/`model`（都走 OpenAI 兼容接口）。
-国内直连，关 VPN 可用——正好和「关 VPN 抓详情页」同一档网络环境。
+**接大模型（三层兜底）**：`llm_config.json` 用 `providers` 链——**本地 Ollama 优先 → 云端 MiniMax 兜底 → 正则**，
+谁先成功用谁，全失败退正则永不崩。换厂商只改某个 provider 的 `base_url`/`model`/`api_key`（都走 OpenAI 兼容接口）。
+本地直连、关 VPN 可用。
+
+## 🆕 本地大模型 + 每日自我进化
+
+**本地大模型（更准更私密）**：双击 **`安装本地大模型.bat`** 一键装 Ollama + 拉 `qwen2.5:7b`，
+并把本地模型接到 `llm_config.json` 的 provider 链最前面。之后抽取面积/造价**优先走本机模型**，
+免费、离线、数据不外传；本地没装或抽不到时自动退 MiniMax，再退正则。
+
+**每日自我进化**（`evolve.py`）：每天让雷达"懂得更多、覆盖更广"，做三件事——
+1. **关键词进化**：用本地大模型结合最近抓到的标题，发现室内/装饰设计相关的新检索词，写入
+   `keywords.json`，**新词第二天自动进入所有抓取器的检索范围**；
+2. **信息源进化**：探测 `sources.json` 里的候选省市源，连通的自动升为 verified（覆盖更多省市）；
+3. **进化日志**：统计源数/词数/项目数/设计命中并与昨天对比，写 `reports/进化日志.md`（增长曲线）。
+
+**多源抓取（注册表驱动）**：`sources.json` 注册表 + `fetch_registry.py` 通用新点抓取器，
+**加一个省 = 加一行配置**，不用写新爬虫。`fetch_intention.py` 抓政府采购意向（招标前的需求前置信号）。
+
+**每天自动跑**：双击 **`安装每日任务.bat`** 注册 Windows 计划任务，每天定点自动
+「进化 → 全量刷新 → 出日报」。命令行等价：`python radar_app.py auto`。
 
 ## 快速开始
 
@@ -126,8 +144,16 @@ decision_engine.py        决策打分引擎
 fetch_detail.py           抓商机详情页正文（公开站直连；采招网需Cookie）
 export_cookies.py         采招网 Cookie 导出小助手（自动读浏览器 / 手动粘贴 / 自检）
 extract.py                面积/造价/关键词提取（标题与详情页共用）
-enrich.py                 详情页增强：抓正文→提取→写 data/详情增强.json（可选挂大模型）
-run_radar.py              主流程：收→解析→打分→(读增强)→出日报
+enrich.py                 详情页增强：抓正文→提取→写 data/详情增强.json（三层大模型兜底）
+run_radar.py              主流程：收→解析→打分→(读增强)→出日报（含采购意向节）
+sources.json              信息源注册表（加省=加一行；verified/candidate/disabled）
+fetch_registry.py         通用新点抓取器（注册表驱动，--probe 自动转正候选源）
+fetch_intention.py        政府采购意向公开抓取（需求前置信号，尽力直连）
+keywords.py / keywords.json 共享关键词库（base 核心词 + 进化发现的 discovered 新词）
+evolve.py                 每日进化引擎（扩词 + 探源 + 记进化日志）
+enable_local_llm.py       把本地 Ollama 接入 llm_config 的 provider 链
+安装本地大模型.bat         一键装 Ollama + qwen2.5 + 接入配置
+安装每日任务.bat           注册 Windows 计划任务，每天自动跑全流程
 daily_job.py              每日任务封装
 push_wechat.py            微信推送
 scripts/md_to_pdf_edge.py Markdown 转 PDF

@@ -3,8 +3,13 @@ email_config.json
 push_config.json
 company_profile.json
 llm_config.json
+llm_config.backup.json
+*.backup.json
 bidcenter_cookies.txt
 shcpe_cookies.txt
+
+# 进化产生的个人关键词库（含发现的新词，非敏感但属个人运行数据）
+keywords.json
 
 # ===== 真实数据 / 运行产物 =====
 inbox/

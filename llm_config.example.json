@@ -1,7 +1,20 @@
 {
   "enabled": false,
-  "base_url": "https://api.minimaxi.com/v1",
-  "api_key": "在此填你的大模型 API Key，并把本文件另存为 llm_config.json",
-  "model": "MiniMax-Text-01",
-  "_说明": "OpenAI 兼容接口，换厂商只改 base_url/model/api_key：MiniMax(国内)=https://api.minimaxi.com/v1 模型 MiniMax-Text-01；MiniMax(海外)=https://api.minimax.io/v1；DeepSeek=https://api.deepseek.com 模型 deepseek-chat；智谱GLM=https://open.bigmodel.cn/api/paas/v4 模型 glm-4-flash；通义千问=https://dashscope.aliyuncs.com/compatible-mode/v1 模型 qwen-plus。enabled=true 才启用，留 false 则只用正则。"
+  "providers": [
+    {
+      "name": "本地Ollama",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "model": "qwen2.5:7b",
+      "timeout": 120
+    },
+    {
+      "name": "MiniMax兜底",
+      "base_url": "https://api.minimaxi.com/v1",
+      "api_key": "",
+      "model": "MiniMax-Text-01",
+      "timeout": 60
+    }
+  ],
+  "_说明": "三层兜底：本地Ollama优先→云端MiniMax→正则。把本文件另存为 llm_config.json，enabled 改 true。本地优先：先跑 安装本地大模型.bat 装好 Ollama+qwen2.5:7b（免费/离线/隐私），本地抽不到或没装时自动退 MiniMax（需在第二个 provider 填 api_key 才生效，留空则跳过）。providers 按顺序依次尝试，谁先成功用谁；都失败退正则。换厂商只改某个 provider 的 base_url/model/api_key：MiniMax(国内)=https://api.minimaxi.com/v1 模型 MiniMax-Text-01；DeepSeek=https://api.deepseek.com 模型 deepseek-chat；智谱GLM=https://open.bigmodel.cn/api/paas/v4 模型 glm-4-flash；通义千问=https://dashscope.aliyuncs.com/compatible-mode/v1 模型 qwen-plus。本地换大模型只改 model（如 qwen2.5:14b 更准、qwen2.5:3b 更快）。"
 }

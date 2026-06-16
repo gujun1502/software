@@ -2,9 +2,10 @@
 """
 上海建设工程招标商机 抓取（shcpe.cn → ciac.zjw.sh.gov.cn 交易平台）
 ====================================================================
-上海的招标公告在 ciac.zjw.sh.gov.cn（JGBAppZtbInterWeb）这个【需登录(SSO)】的平台上，
-接口 POST /JGBAppZtbInterWeb/rest/jygg/list （params: gglx=zbgg, pageNo, pageSize），
-未登录会返回 {code:401, 认证失败}。
+上海的招标信息在 ciac.zjw.sh.gov.cn（JGBAppZtbInterWeb）这个【需登录(SSO)】的平台上。
+门户(SPA)页：https://ciac.zjw.sh.gov.cn/JGBAppZtbInterWeb/pc/#/jyggList?gglx=zbjh
+背后接口 POST /JGBAppZtbInterWeb/rest/jygg/list （params: gglx, pageNo, pageSize），
+gglx 即 SPA 路由里的公告类型：zbjh=招标计划(默认)、zbgg=招标公告。未登录返回 {code:401}。
 
 所以本抓取需要你的登录态 Cookie（xc_ciacsso 等）：
   1) 浏览器登录 https://ciac.zjw.sh.gov.cn 后，运行：python export_cookies.py --site ciac
@@ -35,8 +36,11 @@ TODAY = datetime.date.today().isoformat()
 HOST = "https://ciac.zjw.sh.gov.cn"
 API = HOST + "/JGBAppZtbInterWeb/rest/jygg/list"
 PORTAL = HOST + "/JGBAppZtbInterWeb/pc/"
-# gglx：招标公告=zbgg；如需中标可加 zbjggs/zbhxrgs 等（平台代码，可用 --gglx 覆盖）
-DEFAULT_GGLX = ["zbgg"]
+# gglx：招标计划=zbjh(默认)、招标公告=zbgg；如需中标可加 zbjggs/zbhxrgs 等（可用 --gglx 覆盖）
+DEFAULT_GGLX = ["zbjh"]
+# 公告类型代码 → 报告分类（run_radar 按 category 分桶）
+GGLX_CATEGORY = {"zbjh": "招标预告", "zbgg": "招标公告",
+                 "zbjggs": "中标结果", "zbhxrgs": "中标候选人"}
 
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -87,19 +91,20 @@ def call_list(cookie, gglx="zbgg", pageNo=1, pageSize=20):
     return rows, total, ""
 
 
-def row_to_project(rec):
+def row_to_project(rec, gglx_query="zbjh"):
     title = PE_clean(_pick(rec, "title", "ggmc", "ggbt", "projectName", "xmmc"))
     if not title:
         return None
     gid = _pick(rec, "ggid", "infoid", "id", "rowguid", "ggrowid", "uuid")
-    gglx = _pick(rec, "gglx") or "zbgg"
+    gglx = _pick(rec, "gglx") or gglx_query
     date = str(_pick(rec, "fbsj", "createDate", "infodate", "ggfbsj", "publishDate"))[:10]
-    detail = (f"{PORTAL}#/jyggDetail?ggid={gid}&gglx={gglx}" if gid else PORTAL + "#/jyggList?gglx=zbgg")
+    detail = (f"{PORTAL}#/jyggDetail?ggid={gid}&gglx={gglx}" if gid
+              else f"{PORTAL}#/jyggList?gglx={gglx}")
     return {
         "id": "shcpe_" + (str(gid) or re.sub(r"\W+", "", title)[:24]),
         "title": title,
         "region": "上海市",
-        "category": "招标公告",
+        "category": GGLX_CATEGORY.get(gglx, "招标公告"),
         "pub_date": date,
         "detail_url": detail,
         "业务类型": PE.classify(title),
@@ -122,7 +127,7 @@ def crawl(cookie, gglx_list, pages, page_size):
                 break
             fresh = 0
             for rec in rows:
-                p = row_to_project(rec)
+                p = row_to_project(rec, gglx)
                 if not p or p["id"] in seen:
                     continue
                 seen.add(p["id"]); out.append(p); fresh += 1
@@ -135,14 +140,14 @@ def crawl(cookie, gglx_list, pages, page_size):
 def test_cookie():
     cookie = _load_cookie()
     print(f"=== 上海 ciac 连通自检 ===  cookie: {'有' if cookie else '无（先跑 export_cookies.py --site ciac）'}")
-    rows, total, note = call_list(cookie, "zbgg", 1, 5)
+    rows, total, note = call_list(cookie, "zbjh", 1, 5)
     if note:
         print("✗ 失败：", note)
         print("  → 若是401：在浏览器登录 ciac.zjw.sh.gov.cn 后 `python export_cookies.py --site ciac` 导cookie再试。")
     else:
         print(f"✓ 成功！拿到 {len(rows)} 条（total≈{total}）。可以直接 `python fetch_shcpe.py` 抓取。")
         for rec in rows[:3]:
-            p = row_to_project(rec)
+            p = row_to_project(rec, "zbjh")
             if p:
                 print("   样例:", p["title"][:40])
 

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>商机雷达 · 工作原理一页纸</title>
+<style>
+  :root{
+    --py:#2563eb;       /* 纯 Python 蓝 */
+    --py-bg:#eff6ff;
+    --llm:#d97706;      /* 大模型 橙 */
+    --llm-bg:#fff7ed;
+    --build:#7c3aed;    /* Claude 紫 */
+    --build-bg:#f5f3ff;
+    --ink:#1e293b;
+    --mut:#64748b;
+    --line:#cbd5e1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+    color:var(--ink); background:#f8fafc;
+    padding:18px 22px;
+  }
+  .page{max-width:1000px;margin:0 auto;}
+  h1{font-size:21px;display:flex;align-items:center;gap:10px;}
+  h1 .em{font-size:24px;}
+  .sub{color:var(--mut);font-size:12.5px;margin:4px 0 14px;}
+
+  /* 顶部：两层时间线 */
+  .layers{display:flex;gap:12px;margin-bottom:16px;}
+  .layer{flex:1;border-radius:12px;padding:11px 14px;border:1.5px solid;}
+  .layer.build{background:var(--build-bg);border-color:var(--build);}
+  .layer.run{background:#f0fdf4;border-color:#16a34a;}
+  .layer h3{font-size:13.5px;display:flex;align-items:center;gap:7px;}
+  .layer p{font-size:11.8px;color:var(--mut);margin-top:5px;line-height:1.55;}
+  .tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;color:#fff;}
+  .tag.build{background:var(--build);}
+  .tag.run{background:#16a34a;}
+
+  /* 流水线 */
+  .pipe-title{font-size:13px;font-weight:700;margin:6px 0 9px;color:var(--mut);
+    letter-spacing:.5px;}
+  .pipe{display:flex;align-items:stretch;gap:0;}
+  .step{
+    flex:1;border-radius:11px;padding:11px 9px 10px;border:1.5px solid var(--py);
+    background:var(--py-bg);position:relative;display:flex;flex-direction:column;
+  }
+  .step.llm{border-color:var(--llm);background:var(--llm-bg);}
+  .step .no{
+    position:absolute;top:-9px;left:9px;width:20px;height:20px;border-radius:50%;
+    background:var(--py);color:#fff;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .step.llm .no{background:var(--llm);}
+  .step h4{font-size:13px;margin-top:5px;}
+  .step .file{font-size:10px;color:var(--mut);font-family:Consolas,monospace;margin:3px 0 6px;}
+  .step .desc{font-size:11px;line-height:1.5;color:#334155;flex:1;}
+  .step .kind{font-size:10px;font-weight:700;margin-top:7px;padding:2px 6px;border-radius:6px;
+    align-self:flex-start;}
+  .kind.py{color:var(--py);background:#dbeafe;}
+  .kind.mix{color:var(--llm);background:#fde9cf;}
+  .arrow{display:flex;align-items:center;color:var(--line);font-size:20px;padding:0 2px;}
+
+  /* 大模型放大说明 */
+  .zoom{
+    margin-top:16px;border:1.5px dashed var(--llm);border-radius:12px;
+    background:#fffdf8;padding:13px 16px;
+  }
+  .zoom h3{font-size:13.5px;color:var(--llm);display:flex;align-items:center;gap:7px;}
+  .zoom .flow{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap;}
+  .chip{font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;line-height:1.4;}
+  .chip b{color:var(--llm);}
+  .chip.json{font-family:Consolas,monospace;font-size:10.3px;color:#0f766e;background:#f0fdfa;border-color:#99f6e4;}
+  .zoom .gates{font-size:11px;color:#334155;margin-top:9px;line-height:1.7;}
+  .zoom .gates b{color:var(--llm);}
+
+  /* 底部：异地复刻 */
+  .deploy{display:flex;gap:12px;margin-top:16px;}
+  .card{flex:1;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;}
+  .card h3{font-size:13px;margin-bottom:7px;}
+  .card ul{list-style:none;font-size:11.3px;line-height:1.85;}
+  .card li{padding-left:16px;position:relative;}
+  .card li::before{content:"▸";position:absolute;left:0;color:var(--py);}
+  .card.key{border-color:var(--llm);background:var(--llm-bg);}
+  .card.key li::before{color:var(--llm);}
+  .mono{font-family:Consolas,monospace;font-size:10.5px;color:#475569;}
+
+  .foot{margin-top:14px;font-size:10.8px;color:var(--mut);text-align:center;line-height:1.6;}
+
+  @media print{
+    body{background:#fff;padding:0;}
+    @page{size:A4 landscape;margin:10mm;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1><span class="em">📡</span> 商机雷达 · 一页纸工作原理</h1>
+  <p class="sub">招投标商机自动筛选工具 —— 邮件进，决策日报出。全程纯 Python 骨架，大模型只在「读公告正文」时帮一把忙。</p>
+
+  <!-- 两层认知 -->
+  <div class="layers">
+    <div class="layer build">
+      <h3><span class="tag build">开发时</span> Claude 把工具「造」出来</h3>
+      <p>Claude（Claude Code）在编码阶段把判断逻辑、抓取、打分、排版全部写成 Python。
+         成品 exe 里<strong>不含 Claude、运行时不调用 Claude</strong>——它的活在你点「运行」之前就结束了。</p>
+    </div>
+    <div class="layer run">
+      <h3><span class="tag run">运行时</span> MiniMax 是工具里的「一个零件」</h3>
+      <p>软件跑起来后，<strong>可选</strong>调用云端大模型（MiniMax / DeepSeek，OpenAI 兼容）。
+         本机不装任何模型，只是用 HTTP 发请求。不配也能跑（自动退回正则）。</p>
+    </div>
+  </div>
+
+  <!-- 主流水线 -->
+  <div class="pipe-title">主流程 · 数据像流水线一样走 6 步</div>
+  <div class="pipe">
+    <div class="step">
+      <span class="no">1</span><h4>收邮件</h4>
+      <div class="file">fetch_email.py</div>
+      <div class="desc">IMAP 登录邮箱，拉采招网项目邮件到 inbox/</div>
+      <span class="kind py">纯 Python</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <span class="no">2</span><h4>解析项目</h4>
+      <div class="file">parse_email.py</div>
+      <div class="desc">从邮件 HTML 抠出 标题 / 地区 / 类型</div>
+      <span class="kind py">纯 Python</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <span class="no">3</span><h4>决策打分</h4>
+      <div class="file">decision_engine.py</div>
+      <div class="desc">对照公司资质·业绩库打分：⭐重点 / ○可关注 / ·暂不</div>
+      <span class="kind py">纯 Python 规则</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step llm">
+      <span class="no">4</span><h4>抓详情页 + 提取</h4>
+      <div class="file">enrich.py · fetch_detail.py · extract.py</div>
+      <div class="desc">抓正文，提取 面积/造价/截标/关键词。<strong>唯一用到大模型的一步</strong></div>
+      <span class="kind mix">抓取=Python ｜ 提取=正则+可选MiniMax</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <span class="no">5</span><h4>出日报 PDF</h4>
+      <div class="file">run_radar.py</div>
+      <div class="desc">排序排版 Markdown，本机 Edge 转 PDF</div>
+      <span class="kind py">纯 Python</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <span class="no">6</span><h4>微信推送</h4>
+      <div class="file">push_wechat.py</div>
+      <div class="desc">pushplus/Server酱 推摘要（可选）</div>
+      <span class="kind py">纯 Python</span>
+    </div>
+  </div>
+
+  <!-- 第4步放大 -->
+  <div class="zoom">
+    <h3>🔍 放大第 4 步：大模型到底干了什么（只干这一件小事）</h3>
+    <div class="flow">
+      <span class="chip">公告<b>正文</b>（一大段文字）</span>
+      <span style="color:var(--llm)">→</span>
+      <span class="chip">正则先填一遍兜底</span>
+      <span style="color:var(--llm)">→</span>
+      <span class="chip"><b>MiniMax</b> 读正文，抽结构化字段</span>
+      <span style="color:var(--llm)">→</span>
+      <span class="chip json">{ "面积":"3500㎡", "造价":"280万元", "截标时间":"…", "关键词":[…] }</span>
+      <span style="color:var(--llm)">→</span>
+      <span class="chip">非空字段覆盖正则值</span>
+    </div>
+    <div class="gates">
+      <b>MiniMax 何时才启动？三个闸门同时满足：</b>
+      ① 执行「更新数据」流程（跑到第 4 步抓详情页，只「生成日报」不碰它）&nbsp;｜&nbsp;
+      ② llm_config.json 里 <span class="mono">enabled:true</span> 且填了 <span class="mono">api_key</span>（没填自动降级正则）&nbsp;｜&nbsp;
+      ③ 详情页正文成功抓到。<br>
+      任一不满足 → <b>自动退回正则，照样出日报</b>，只是个别面积/造价可能显示「—」。这就是它在别的电脑上「死不了」的原因。
+    </div>
+  </div>
+
+  <!-- 异地复刻 -->
+  <div class="deploy">
+    <div class="card">
+      <h3>📦 换台电脑为什么能原样复刻</h3>
+      <ul>
+        <li>PyInstaller 把 <strong>Python 解释器+所有库塞进 exe</strong> → 对方不装 Python、不开 VPN</li>
+        <li><span class="mono">app_paths.py</span> 让配置/data/reports <strong>跟 exe 放一起</strong>，可直接编辑</li>
+        <li>智能部分本来就在云端 → 那台机器只是换个地方发同一个 HTTP 请求</li>
+      </ul>
+    </div>
+    <div class="card key">
+      <h3>🔑 拷过去要带的东西</h3>
+      <ul>
+        <li><span class="mono">商机雷达.exe</span></li>
+        <li><span class="mono">company_profile.json</span> 公司资质（决定打分）</li>
+        <li><span class="mono">email_config.json</span> 邮箱授权码</li>
+        <li><span class="mono">llm_config.json</span> 填上 MiniMax <b>api_key</b> → 大模型就在那台机器活了</li>
+        <li><span class="mono">data/ · inbox/</span> 历史数据</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="foot">
+    一句话：<b style="color:var(--build)">Claude</b> 开发期造工具（成品不含它）&nbsp;·&nbsp;
+    <b style="color:var(--py)">Python</b> 撑起 90% 确定性骨架&nbsp;·&nbsp;
+    <b style="color:var(--llm)">MiniMax</b> 运行期可选地读一段正文抽 4 个字段（云端调用，无需本地模型）。<br>
+    能复刻 = 智能在云端 + exe 自带 Python + 配置跟着走 + 没网没 key 时正则永不崩。
+  </p>
+
+</div>
+</body>
+</html>
