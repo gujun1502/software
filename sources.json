@@ -44,7 +44,8 @@
       "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
       "category": "003",
       "id_prefix": "gx",
-      "status": "candidate"
+      "status": "candidate",
+      "_备注": "域名已核对。非标准新点：getFullTextDataNew 连接失败/返回非JSON，需扒真实检索API；或改用南宁/柳州/桂林市级源(部分为新点)。"
     },
     {
       "id": "ynggzy",
@@ -55,7 +56,8 @@
       "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
       "category": "003",
       "id_prefix": "yn",
-      "status": "candidate"
+      "status": "candidate",
+      "_备注": "域名已核对。非新点(疑筑龙zhulong后端)：getFullTextDataNew 返回HTML非JSON，URL结构为/jyxx/zfcg/cggg，需扒真实检索API。"
     },
     {
       "id": "hbggzy",
@@ -66,6 +68,77 @@
       "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
       "category": "003",
       "id_prefix": "hb",
+      "status": "candidate"
+    },
+    {
+      "id": "zjggzy",
+      "name": "浙江省公共资源交易服务平台",
+      "region": "浙江",
+      "kind": "epoint",
+      "home": "https://ggzy.zj.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "002",
+      "id_prefix": "zj",
+      "status": "verified",
+      "_备注": "民宿/文旅强省（莫干山等）。新点后端，category=002(交易公告，与江苏003不同)。2026-06-18 实测连通。"
+    },
+    {
+      "id": "fjggzy",
+      "name": "福建省公共资源交易电子公共服务平台",
+      "region": "福建",
+      "kind": "epoint",
+      "home": "https://ggzyfw.fj.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "fj",
+      "status": "candidate",
+      "_备注": "民宿/乡村文旅强省。域名已核对(ggzyfw.fj.gov.cn)，但 getFullTextDataNew 返回HTML非JSON→该站全文检索接口路径与新点不同，待扒真实API。"
+    },
+    {
+      "id": "gzggzy",
+      "name": "贵州省公共资源交易中心",
+      "region": "贵州",
+      "kind": "epoint",
+      "home": "https://ggzy.guizhou.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "gz",
+      "status": "candidate",
+      "_备注": "乡村振兴/民宿/康养项目多。域名已核对(ggzy.guizhou.gov.cn)，但非标准新点：getFullTextDataNew 返回HTML非JSON，需扒真实检索API。"
+    },
+    {
+      "id": "higgzy",
+      "name": "海南省公共资源交易服务平台",
+      "region": "海南",
+      "kind": "epoint",
+      "home": "https://ggzy.hainan.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "hi",
+      "status": "candidate",
+      "_备注": "度假/酒店/民宿/康养强省。省级 ggzy.hainan.gov.cn 非标准新点交易接口；海口市 ggzy.haikou.gov.cn 也非新点。待扒真实API或改用市级源。"
+    },
+    {
+      "id": "scggzy",
+      "name": "四川省公共资源交易信息网",
+      "region": "四川",
+      "kind": "epoint",
+      "home": "https://ggzyjy.sc.gov.cn",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "002",
+      "id_prefix": "sc",
+      "status": "verified",
+      "_备注": "文旅/民宿/康养强省。新点后端 category=002。2026-06-18 实测连通。"
+    },
+    {
+      "id": "cqggzy",
+      "name": "重庆市公共资源交易中心",
+      "region": "重庆",
+      "kind": "epoint",
+      "home": "http://www.cqggzy.com",
+      "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
+      "category": "003",
+      "id_prefix": "cq",
       "status": "candidate"
     }
   ]

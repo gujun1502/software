@@ -88,6 +88,10 @@ def record_to_project(rec, src):
     link = rec.get("linkurl") or ""
     detail = urllib.parse.urljoin(src["home"], link) if link else ""
     date = (rec.get("infodatepx") or rec.get("infodate") or "").split(" ")[0]
+    if not date and link:                      # 部分源(如浙江)infodate为空，日期在链接路径 /YYYYMMDD/ 里
+        md = re.search(r"/(\d{4})(\d{2})(\d{2})/", link)
+        if md:
+            date = f"{md.group(1)}-{md.group(2)}-{md.group(3)}"
     region = (rec.get("zhuanzai") or src.get("region") or "").strip()
     pfx = src.get("id_prefix") or src["id"]
     m = re.search(r"([0-9a-f]{8}-[0-9a-f-]{20,})", link)

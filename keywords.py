@@ -13,22 +13,37 @@ def load_data():
         try:
             d = json.loads(KW_FILE.read_text(encoding="utf-8"))
             d.setdefault("base", BASE_DEFAULT)
+            d.setdefault("directions", {})
             d.setdefault("discovered", [])
             return d
         except Exception:
             pass
-    return {"base": list(BASE_DEFAULT), "discovered": [], "updated": ""}
+    return {"base": list(BASE_DEFAULT), "directions": {}, "discovered": [], "updated": ""}
 
 
 def save_data(d):
     KW_FILE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _flatten_directions(directions):
+    """directions 可为 {方向名:[词,...]} 或扁平 [词,...]，统一摊平成词列表。"""
+    if isinstance(directions, dict):
+        out = []
+        for words in directions.values():
+            out += list(words or [])
+        return out
+    return list(directions or [])
+
+
 def load(limit=None):
-    """合并 base+discovered，去重保序。limit 限制总数（抓取礼貌性）。"""
+    """合并 base+directions(新业务方向)+discovered，去重保序。
+    limit 限制总数（抓取礼貌性）。directions 让「民宿/私人投资」等新方向词进入全网搜索。"""
     d = load_data()
+    pool = (list(d.get("base", []))
+            + _flatten_directions(d.get("directions", {}))
+            + list(d.get("discovered", [])))
     out, seen = [], set()
-    for k in list(d.get("base", [])) + list(d.get("discovered", [])):
+    for k in pool:
         k = (k or "").strip()
         if k and k not in seen:
             seen.add(k)

@@ -40,9 +40,16 @@ if MARKER.exists() and MARKER.read_text(encoding="utf-8-sig").strip() == TODAY:
 try:
     import fetch_email
     import run_radar
-    print("步骤1/2：读取采招网邮件 …")
+    print("步骤1/3：读取采招网邮件 …")
     fetch_email.fetch()
-    print("步骤2/2：决策打分并生成日报 …")
+    print("步骤2/3：关键词进化（每日扩词，新词次日进入抓取范围）…")
+    try:
+        import evolve
+        sys.argv = [sys.argv[0]]      # evolve 用 argparse，避免继承本进程参数
+        evolve.main()
+    except Exception as e:
+        print(f"  （关键词进化跳过，不影响日报：{e}）")
+    print("步骤3/3：决策打分并生成日报 …")
     run_radar.main()
     MARKER.write_text(TODAY, encoding="utf-8")
     print(f"[{TODAY}] ✓ 全部完成，已写当天完成标记。")

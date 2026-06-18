@@ -61,7 +61,7 @@ def sample_titles(n=40):
 
 def evolve_keywords(cfg, max_new=6):
     data = KW.load_data()
-    current = list(data.get("base", [])) + list(data.get("discovered", []))
+    current = KW.load()   # base + directions(民宿/私人投资等新方向) + discovered，避免重复发现
     titles = sample_titles()
     user = (f"现有检索词：{ '、'.join(current) }\n\n"
             f"最近抓到的设计类标题（节选）：\n- " + "\n- ".join(titles or ["（暂无样本）"]) +

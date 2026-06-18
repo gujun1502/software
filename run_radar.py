@@ -11,6 +11,7 @@ import os, sys, subprocess, pathlib, datetime, json
 import parse_email
 import decision_engine as DE
 import push_wechat
+import rotation
 from extract import extract_area, extract_cost, extract_keywords
 
 from app_paths import ROOT  # 打包后指向 exe 目录
@@ -28,6 +29,13 @@ for d in (REPORTS, DATA):
 WINDOW_DAYS = 15
 WINDOW_START = datetime.date.today() - datetime.timedelta(days=WINDOW_DAYS)
 
+# 新拓展方向（民宿/私人投资/文旅康养）刚起步、项目节奏慢、单量少，给一年回溯窗：
+# 既看在建管线，也把近一年的同类项目当市场情报(谁在做/造价水平/重复业主)。
+# 核心业务(银行/办公等)仍只看最近 15 天保持新鲜。起步期过后可调小。
+NEW_DIR_WINDOW_DAYS = 365
+NEW_DIR_WINDOW_START = datetime.date.today() - datetime.timedelta(days=NEW_DIR_WINDOW_DAYS)
+NEW_DIRECTIONS = {"民宿", "私人/别墅", "文旅康养"}
+
 
 def _parse_pub_date(s):
     """把 pub_date(形如 2026-06-11)解析成 date；解析不了返回 None。"""
@@ -41,12 +49,13 @@ def _parse_pub_date(s):
 
 
 def in_window(p):
-    """标书发出日期是否落在「搜索日前 WINDOW_DAYS 天 ~ 今天」窗口内。
-    无日期(解析不出)的条目按保留处理，避免漏掉可能很新的商机。"""
+    """标书发出日期是否落在回溯窗口内。无日期(解析不出)的条目按保留处理。
+    核心业务用 15 天窗保持新鲜；民宿/私人/文旅等新方向用 90 天窗，便于起步阶段看全管线。"""
     d = _parse_pub_date(p.get("pub_date"))
     if d is None:
         return True
-    return d >= WINDOW_START
+    start = NEW_DIR_WINDOW_START if p.get("业务类型") in NEW_DIRECTIONS else WINDOW_START
+    return d >= start
 
 
 def filter_window(projects):
@@ -61,6 +70,11 @@ def attention(score):
     if score >= 40:
         return "○可关注"
     return "·暂不关注"
+
+
+def listing_badge(day):
+    """上榜状态徽标：第1天=🆕新，第2天=2️⃣第2天(末日，明天下架)。"""
+    return "🆕 新" if day <= 1 else "2️⃣ 第2天"
 
 
 def load_enrichment():
@@ -84,9 +98,12 @@ def field_of(p, key, enrich, title_fallback):
     return title_fallback
 
 
-def build_report(scored, results, filtered, enrich=None, intentions=None):
+def build_report(scored, results, filtered, enrich=None, intentions=None,
+                 days_map=None, rot_stats=None):
     enrich = enrich or {}
     intentions = intentions or []
+    days_map = days_map or {}
+    rot_stats = rot_stats or {}
     enriched_n = sum(1 for p, _ in scored if (enrich.get(p.get("id") or "") or {}).get("ok"))
     L = [f"# 商机雷达决策日报 · {TODAY}", ""]
     L.append(f"> **设计类**可投商机 **{len(scored)}** 条　|　采购意向(需求前置) {len(intentions)} 条　|　"
@@ -96,11 +113,19 @@ def build_report(scored, results, filtered, enrich=None, intentions=None):
     # 一、可投商机排序：面积+控制价合并一格(上下排)，新增「标书发出/截标」一列
     L.append("## 一、可投商机 · 契合度排序")
     L.append("")
+    if rot_stats:
+        ok = "✅满足" if rot_stats.get("保证新增满足") else "⚠️不足(请运行更新/进化补新源)"
+        L.append(f"> 🔄 **每日轮换**：本期上榜 **{rot_stats.get('上榜', len(scored))}** 条"
+                 f"（🆕 全新 {rot_stats.get('新增', 0)} 条·2️⃣ 第2天 {rot_stats.get('第2天', 0)} 条），"
+                 f"昨日满 2 天**自动下架 {rot_stats.get('下架', 0)} 条**。"
+                 f"每天保证 ≥{rot_stats.get('MIN_NEW', 3)} 条全新：{ok}。")
+        L.append("")
     L.append("> 单元格上下两行：「面积/控制价」= 上面积·下控制价；"
-             "「标书发出/截标」= 上发布日·下投标截止。`—` 表示该项未取到。")
+             "「标书发出/截标」= 上发布日·下投标截止。`—` 表示该项未取到。"
+             "「上榜」列：🆕 新=今日首次出现；2️⃣ 第2天=明日起下架。")
     L.append("")
-    L.append("| 名次 | 关注度 | 契合度 | 业务 | 地区 | 面积/控制价 | 标书发出/截标 | 关键词 | 项目 |")
-    L.append("|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|---|")
+    L.append("| 名次 | 上榜 | 关注度 | 契合度 | 业务 | 地区 | 面积/控制价 | 标书发出/截标 | 关键词 | 项目 |")
+    L.append("|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|---|")
     for i, (p, d) in enumerate(scored, 1):
         score = d["契合度"] if d["契合度"] is not None else 0
         title = p["title"].replace("|", "／")
@@ -112,7 +137,8 @@ def build_report(scored, results, filtered, enrich=None, intentions=None):
         area_cost = f"{area}<br>{cost}"          # 上：面积　下：控制价
         time_cell = f"{release}<br>{deadline}"    # 上：标书发出　下：截标
         kw = field_of(p, "关键词", enrich, extract_keywords(p["title"]))
-        L.append(f"| {i} | {attention(score)} | {score} | {p['业务类型']} "
+        badge = listing_badge(days_map.get(p.get("id") or p.get("title"), 1))
+        L.append(f"| {i} | {badge} | {attention(score)} | {score} | {p['业务类型']} "
                  f"| {p['region']} | {area_cost} | {time_cell} | {kw} | {link} |")
     L.append("")
 
@@ -165,10 +191,11 @@ def build_report(scored, results, filtered, enrich=None, intentions=None):
     L.append("> ⚠️ 邮件只含标题/地区/类型；**资质·业绩·控制价等「废标级」要求需打开详情页确认**"
              "（你的采招网账号可看）。本表为契合度初筛排序，帮你定「先看哪几个」。")
     L.append("")
-    L.append(f"> 🕒 **时间窗（只砍太旧的，不设上限）**：只保留「标书发出日期」在 "
-             f"**{WINDOW_START.isoformat()} 当天及以后**的商机——含今天、也含查询日之后发出/截标的；"
-             f"只有更早（发出日期早于 {WINDOW_START.isoformat()}）的才一律不收录。"
-             "少数详情页未取到发出日期的条目按保留处理，请打开详情页核对发布时间。")
+    L.append(f"> 🕒 **时间窗（只砍太旧的，不设上限）**：核心业务(银行/办公等)只保留「标书发出日期」在 "
+             f"**{WINDOW_START.isoformat()} 当天及以后**(近{WINDOW_DAYS}天)的，保持新鲜；"
+             f"**民宿 / 私人投资 / 文旅康养等新方向**因刚起步、节奏慢，放宽到 **{NEW_DIR_WINDOW_START.isoformat()} 起**"
+             f"(近{NEW_DIR_WINDOW_DAYS}天≈一年)，既看在建管线、也把近一年同类项目当市场情报(谁在做/造价/重复业主)。"
+             "无发出日期的条目一律保留，请打开详情页核对发布时间。")
     L.append("")
     L.append("> 🔎 **本期数据范围**：采招网定制邮件 + 江苏/安徽公共资源交易网抓取。"
              "检索「中国银行」仅命中：**武汉江夏支行**（已列入第1位）、**陕西省分行**"
@@ -180,9 +207,10 @@ def build_report(scored, results, filtered, enrich=None, intentions=None):
     return "\n".join(L)
 
 
-def push_summary(scored, results, filtered):
+def push_summary(scored, results, filtered, days_map=None):
     """生成并推送微信文字摘要（TOP重点商机）。"""
     import json as _json
+    days_map = days_map or {}
     n = _json.loads((ROOT / "push_config.json").read_text(encoding="utf-8")).get("top_n", 8) \
         if (ROOT / "push_config.json").exists() else 8
     title = f"商机雷达 {TODAY}：{len(scored)}条设计商机"
@@ -192,7 +220,8 @@ def push_summary(scored, results, filtered):
              f"#### 重点关注 · 契合度 TOP{min(n, len(scored))}"]
     for i, (p, d) in enumerate(scored[:n], 1):
         score = d["契合度"] if d["契合度"] is not None else 0
-        lines.append(f"{i}. **[{score}]** {p['业务类型']}·{p['region']}　{p['title'][:26]}")
+        mark = "🆕" if days_map.get(p.get("id") or p.get("title"), 1) <= 1 else "2️⃣"
+        lines.append(f"{i}. {mark} **[{score}]** {p['业务类型']}·{p['region']}　{p['title'][:26]}")
     lines.append("")
     lines.append("> 完整决策日报 PDF 在电脑 reports 文件夹。")
     push_wechat.push(title, "\n".join(lines))
@@ -285,6 +314,14 @@ def main():
     scored = score_all(bids)
     scored_intent = score_all(intents)
 
+    # 每日轮换/下架：连续上榜满 2 天的第 3 天移除，保证每天有新商机进来
+    scored, dropped_rot, rot_stats, days_map = rotation.apply_rotation(scored)
+    print(f"轮换下架：上榜 {rot_stats['上榜']} 条（全新 {rot_stats['新增']}·第2天 "
+          f"{rot_stats['第2天']}），满2天下架 {rot_stats['下架']} 条")
+    if not rot_stats["保证新增满足"]:
+        print(f"  ⚠️ 今日全新商机仅 {rot_stats['新增']} 条 < 保证值 {rot_stats['MIN_NEW']} 条；"
+              f"建议运行『更新数据』或『进化(扩词/探新源)』补充新源。")
+
     # 存竞争情报到历史中标库
     win_db = DATA / "历史中标.json"
     existing = json.loads(win_db.read_text(encoding="utf-8")) if win_db.exists() else []
@@ -295,10 +332,11 @@ def main():
     win_db.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
     enrich = load_enrichment()
-    md = build_report(scored, results, filtered, enrich, scored_intent)
+    md = build_report(scored, results, filtered, enrich, scored_intent,
+                      days_map=days_map, rot_stats=rot_stats)
     out = to_pdf(md)
     try:
-        push_summary(scored, results, filtered)
+        push_summary(scored, results, filtered, days_map)
     except Exception as e:
         print("  (微信推送出错，不影响报告:", e, ")")
     print(f"\n=== 完成 ===")
