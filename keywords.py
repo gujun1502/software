@@ -7,18 +7,34 @@ from app_paths import ROOT
 KW_FILE = ROOT / "keywords.json"
 BASE_DEFAULT = ["室内", "装饰", "装修", "精装", "改造"]
 
+# 新拓展业务方向的默认检索词（写进代码随仓库分发，因为 keywords.json 被 gitignore）。
+# 注意：本地若已存在 keywords.json，则以文件里的 directions 为准（用户/进化结果优先），
+# 这些默认值只在「没有该字段」时兜底（如全新克隆、首次运行）。
+DIRECTIONS_DEFAULT = {
+    "民宿文旅": ["民宿", "精品民宿", "民宿设计", "民宿改造", "乡村民宿", "文旅民宿", "客栈",
+                 "度假酒店", "精品酒店", "温泉酒店", "康养中心", "田园综合体", "特色小镇", "老宅改造"],
+    "私人投资": ["私人投资", "私人定制", "私宅", "别墅", "别墅设计", "豪宅", "大平层", "自建房",
+                 "私人会所", "会所设计", "样板房", "售楼处", "餐饮空间", "商业空间"],
+}
+
+
+def _default_directions():
+    """返回一份新拷贝，避免外部修改污染模块级默认值。"""
+    return {k: list(v) for k, v in DIRECTIONS_DEFAULT.items()}
+
 
 def load_data():
     if KW_FILE.exists():
         try:
             d = json.loads(KW_FILE.read_text(encoding="utf-8"))
-            d.setdefault("base", BASE_DEFAULT)
-            d.setdefault("directions", {})
+            d.setdefault("base", list(BASE_DEFAULT))
+            d.setdefault("directions", _default_directions())
             d.setdefault("discovered", [])
             return d
         except Exception:
             pass
-    return {"base": list(BASE_DEFAULT), "directions": {}, "discovered": [], "updated": ""}
+    return {"base": list(BASE_DEFAULT), "directions": _default_directions(),
+            "discovered": [], "updated": ""}
 
 
 def save_data(d):
