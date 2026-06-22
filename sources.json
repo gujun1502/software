@@ -115,7 +115,7 @@
       "api": "/inteligentsearch/rest/esinteligentsearch/getFullTextDataNew",
       "category": "003",
       "id_prefix": "hi",
-      "status": "candidate",
+      "status": "verified",
       "_备注": "度假/酒店/民宿/康养强省。省级 ggzy.hainan.gov.cn 非标准新点交易接口；海口市 ggzy.haikou.gov.cn 也非新点。待扒真实API或改用市级源。"
     },
     {

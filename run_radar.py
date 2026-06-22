@@ -22,19 +22,12 @@ ENRICH_FILE = DATA / "详情增强.json"
 for d in (REPORTS, DATA):
     d.mkdir(exist_ok=True)
 
-# 时间窗：只砍掉「标书发出日期」太旧的，不设上限。
-# 保留条件 pub_date >= 今天-15天（含今天、也含查询日之后发出/截标的未来日期）；
-# 只有更早(早于 今天-15天)发出的才剔除。
-# 全部板块统一执行（可投商机/采购意向/竞争情报）。没抓到日期的条目保留。
-WINDOW_DAYS = 15
+# 时间窗：只收「标书发出日期」是昨天或今天的，更早的一律不再考虑。
+# 保留条件 pub_date >= 今天-1天（即昨天与今天；也含查询日之后发出/截标的未来日期）。
+# 全部板块、全部业务方向统一执行（可投商机/采购意向/竞争情报，含民宿/私人银行/家办等
+# 新方向）。没抓到发出日期的条目保留，请打开详情页自行核对发布时间。
+WINDOW_DAYS = 1
 WINDOW_START = datetime.date.today() - datetime.timedelta(days=WINDOW_DAYS)
-
-# 新拓展方向（民宿/私人投资/文旅康养）刚起步、项目节奏慢、单量少，给一年回溯窗：
-# 既看在建管线，也把近一年的同类项目当市场情报(谁在做/造价水平/重复业主)。
-# 核心业务(银行/办公等)仍只看最近 15 天保持新鲜。起步期过后可调小。
-NEW_DIR_WINDOW_DAYS = 365
-NEW_DIR_WINDOW_START = datetime.date.today() - datetime.timedelta(days=NEW_DIR_WINDOW_DAYS)
-NEW_DIRECTIONS = {"民宿", "私人/别墅", "文旅康养"}
 
 
 def _parse_pub_date(s):
@@ -49,13 +42,12 @@ def _parse_pub_date(s):
 
 
 def in_window(p):
-    """标书发出日期是否落在回溯窗口内。无日期(解析不出)的条目按保留处理。
-    核心业务用 15 天窗保持新鲜；民宿/私人/文旅等新方向用 90 天窗，便于起步阶段看全管线。"""
+    """标书发出日期是否落在「昨天+今天」窗口内。无日期(解析不出)的条目按保留处理。
+    所有业务方向统一只看最近两天，保证日报里全是最新鲜的商机。"""
     d = _parse_pub_date(p.get("pub_date"))
     if d is None:
         return True
-    start = NEW_DIR_WINDOW_START if p.get("业务类型") in NEW_DIRECTIONS else WINDOW_START
-    return d >= start
+    return d >= WINDOW_START
 
 
 def filter_window(projects):
@@ -191,10 +183,9 @@ def build_report(scored, results, filtered, enrich=None, intentions=None,
     L.append("> ⚠️ 邮件只含标题/地区/类型；**资质·业绩·控制价等「废标级」要求需打开详情页确认**"
              "（你的采招网账号可看）。本表为契合度初筛排序，帮你定「先看哪几个」。")
     L.append("")
-    L.append(f"> 🕒 **时间窗（只砍太旧的，不设上限）**：核心业务(银行/办公等)只保留「标书发出日期」在 "
-             f"**{WINDOW_START.isoformat()} 当天及以后**(近{WINDOW_DAYS}天)的，保持新鲜；"
-             f"**民宿 / 私人投资 / 文旅康养等新方向**因刚起步、节奏慢，放宽到 **{NEW_DIR_WINDOW_START.isoformat()} 起**"
-             f"(近{NEW_DIR_WINDOW_DAYS}天≈一年)，既看在建管线、也把近一年同类项目当市场情报(谁在做/造价/重复业主)。"
+    L.append(f"> 🕒 **时间窗（只收最新两天）**：所有板块、所有方向(含银行/办公/民宿/私人银行/家办等)"
+             f"一律只保留「标书发出日期」在 **{WINDOW_START.isoformat()} 当天及以后**(即昨天+今天)的，"
+             f"更早发布的不再考虑，保证全是最新鲜商机。"
              "无发出日期的条目一律保留，请打开详情页核对发布时间。")
     L.append("")
     L.append("> 🔎 **本期数据范围**：采招网定制邮件 + 江苏/安徽公共资源交易网抓取。"
@@ -288,9 +279,9 @@ def main():
     projects = load_scraped(projects)      # 合并本机抓取的省级站（安徽等）
     print(f"解析到 {len(projects)} 条项目")
 
-    # 时间窗过滤：只留「标书发出日期」在搜索日前 15 天以内的（更早的一律剔除）
+    # 时间窗过滤：只留「标书发出日期」是昨天或今天的（更早的一律剔除）
     projects, dropped = filter_window(projects)
-    print(f"时间窗筛选(发出日期 ≥ {WINDOW_START.isoformat()}，不设上限·含未来日期)："
+    print(f"时间窗筛选(发出日期 ≥ {WINDOW_START.isoformat()}，即昨天+今天·含未来日期)："
           f"剔除过旧 {dropped} 条，保留 {len(projects)} 条")
 
     bids_all = [p for p in projects if p["category"] in ("招标公告", "采购信息", "招标预告")]
