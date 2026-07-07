@@ -22,11 +22,13 @@ ENRICH_FILE = DATA / "详情增强.json"
 for d in (REPORTS, DATA):
     d.mkdir(exist_ok=True)
 
-# 时间窗：只收「标书发出日期」是昨天或今天的，更早的一律不再考虑。
-# 保留条件 pub_date >= 今天-1天（即昨天与今天；也含查询日之后发出/截标的未来日期）。
-# 全部板块、全部业务方向统一执行（可投商机/采购意向/竞争情报，含民宿/私人银行/家办等
-# 新方向）。没抓到发出日期的条目保留，请打开详情页自行核对发布时间。
-WINDOW_DAYS = 1
+# 时间窗：收「标书发出日期」在最近 WINDOW_DAYS 天内的商机。
+# 为什么不是"只收昨天+今天"：采招网定制邮件到达本机时，内容普遍已滞后 4~8 天
+# （如 7月7日 收到的邮件装的是 6月29日~7月3日 的信息），2 天窗会把几乎全部
+# 数据剔光（曾出现 6168 条只剩 1 条、日报 0 商机）。7 天窗刚好盖住邮件滞后。
+# 另一条保留通道：只要「截标时间」还没过（详情增强抓到的），项目就仍可投——
+# 发布得早不等于机会已失效。
+WINDOW_DAYS = 7
 WINDOW_START = datetime.date.today() - datetime.timedelta(days=WINDOW_DAYS)
 
 
@@ -41,18 +43,21 @@ def _parse_pub_date(s):
         return None
 
 
-def in_window(p):
-    """标书发出日期是否落在「昨天+今天」窗口内。无日期(解析不出)的条目按保留处理。
-    所有业务方向统一只看最近两天，保证日报里全是最新鲜的商机。"""
+def in_window(p, enrich=None):
+    """发出日期在最近 WINDOW_DAYS 天内，或截标时间未过 → 保留。
+    无日期(解析不出)的条目按保留处理。"""
     d = _parse_pub_date(p.get("pub_date"))
-    if d is None:
+    if d is None or d >= WINDOW_START:
         return True
-    return d >= WINDOW_START
+    # 发布早于窗口，但详情页抓到的截标时间还没过 → 仍是活商机，保留
+    e = (enrich or {}).get(p.get("id") or "") or {}
+    dl = _parse_pub_date(e.get("截标时间"))
+    return dl is not None and dl >= datetime.date.today()
 
 
-def filter_window(projects):
-    """剔除发出日期早于窗口起点的项目，返回(保留列表, 剔除数)。"""
-    kept = [p for p in projects if in_window(p)]
+def filter_window(projects, enrich=None):
+    """剔除发出日期早于窗口起点、且截标已过(或未知)的项目，返回(保留列表, 剔除数)。"""
+    kept = [p for p in projects if in_window(p, enrich)]
     return kept, len(projects) - len(kept)
 
 
@@ -183,15 +188,15 @@ def build_report(scored, results, filtered, enrich=None, intentions=None,
     L.append("> ⚠️ 邮件只含标题/地区/类型；**资质·业绩·控制价等「废标级」要求需打开详情页确认**"
              "（你的采招网账号可看）。本表为契合度初筛排序，帮你定「先看哪几个」。")
     L.append("")
-    L.append(f"> 🕒 **时间窗（只收最新两天）**：所有板块、所有方向(含银行/办公/民宿/私人银行/家办等)"
-             f"一律只保留「标书发出日期」在 **{WINDOW_START.isoformat()} 当天及以后**(即昨天+今天)的，"
-             f"更早发布的不再考虑，保证全是最新鲜商机。"
+    L.append(f"> 🕒 **时间窗（最近{WINDOW_DAYS}天 + 截标未过）**：所有板块、所有方向"
+             f"(含银行/办公/酒店/民宿/私人银行/家办等)保留「标书发出日期」在 "
+             f"**{WINDOW_START.isoformat()} 及以后**的；发布更早但**截标时间还没到**的也保留"
+             "（机会未失效）。采招网邮件普遍滞后数天，故窗口取一周而非两天。"
              "无发出日期的条目一律保留，请打开详情页核对发布时间。")
     L.append("")
-    L.append("> 🔎 **本期数据范围**：采招网定制邮件 + 江苏/安徽公共资源交易网抓取。"
-             "检索「中国银行」仅命中：**武汉江夏支行**（已列入第1位）、**陕西省分行**"
-             "（供应商选型入围，非设计已剔除）；**未发现「中国银行徐州分行」装修设计项目**——"
-             "不在本期邮件与抓取范围内（可能发布时间在窗口外或走了其他平台，建议在采招网账号内直接搜索确认）。")
+    L.append("> 🔎 **本期数据范围**：采招网定制邮件 + 江苏/安徽/湖南/四川/浙江等公共资源交易网抓取"
+             "（每日自动重抓最近一周新公告）。特定业主(如某银行某分行)未出现时，"
+             "可能发布在窗口外或走了其他平台，建议在采招网账号内直接搜索确认。")
     L.append("")
     L.append("---")
     L.append(f"*Out Building Decision · 邮件版商机雷达 · {TODAY}　决策仅供参考，最终由人拍板*")
@@ -279,9 +284,10 @@ def main():
     projects = load_scraped(projects)      # 合并本机抓取的省级站（安徽等）
     print(f"解析到 {len(projects)} 条项目")
 
-    # 时间窗过滤：只留「标书发出日期」是昨天或今天的（更早的一律剔除）
-    projects, dropped = filter_window(projects)
-    print(f"时间窗筛选(发出日期 ≥ {WINDOW_START.isoformat()}，即昨天+今天·含未来日期)："
+    # 时间窗过滤：留「发出日期在最近一周」或「截标时间未过」的（其余剔除）
+    enrich = load_enrichment()
+    projects, dropped = filter_window(projects, enrich)
+    print(f"时间窗筛选(发出日期 ≥ {WINDOW_START.isoformat()} 或截标未过)："
           f"剔除过旧 {dropped} 条，保留 {len(projects)} 条")
 
     bids_all = [p for p in projects if p["category"] in ("招标公告", "采购信息", "招标预告")]
@@ -322,7 +328,6 @@ def main():
             existing.append(p)
     win_db.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    enrich = load_enrichment()
     md = build_report(scored, results, filtered, enrich, scored_intent,
                       days_map=days_map, rot_stats=rot_stats)
     out = to_pdf(md)

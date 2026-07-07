@@ -40,16 +40,34 @@ if MARKER.exists() and MARKER.read_text(encoding="utf-8-sig").strip() == TODAY:
 try:
     import fetch_email
     import run_radar
-    print("步骤1/3：读取采招网邮件 …")
+    print("步骤1/4：读取采招网邮件 …")
     fetch_email.fetch()
-    print("步骤2/3：关键词进化（每日扩词，新词次日进入抓取范围）…")
+
+    # 关键修复(2026-07-07)：以前每日任务只读邮件、从不重抓省级源，
+    # data/reg_*.json 会永远停在最后一次手动抓取的那天，时间窗一过日报就空了。
+    # 现在每天自动重抓所有 verified 源最近一周的公告（失败只提示，不影响日报）。
+    print("步骤2/4：重抓各省公共资源交易网（最近7天新公告）…")
+    for mod_name, run in [
+        ("fetch_registry", lambda m: m.crawl_all(days=7, pages=2)),
+        ("fetch_jiangsu",  lambda m: m.main()),
+        ("fetch_ahjyztb",  lambda m: m.main()),
+        ("fetch_intention", lambda m: m.main()),
+    ]:
+        try:
+            sys.argv = [sys.argv[0]]          # 各抓取器用 argparse，避免继承本进程参数
+            mod = __import__(mod_name)
+            run(mod)
+        except Exception as e:
+            print(f"  （{mod_name} 抓取失败跳过，不影响日报；若在用VPN请关闭：{e}）")
+
+    print("步骤3/4：关键词进化（每日扩词，新词次日进入抓取范围）…")
     try:
         import evolve
         sys.argv = [sys.argv[0]]      # evolve 用 argparse，避免继承本进程参数
         evolve.main()
     except Exception as e:
         print(f"  （关键词进化跳过，不影响日报：{e}）")
-    print("步骤3/3：决策打分并生成日报 …")
+    print("步骤4/4：决策打分并生成日报 …")
     run_radar.main()
     MARKER.write_text(TODAY, encoding="utf-8")
     print(f"[{TODAY}] ✓ 全部完成，已写当天完成标记。")

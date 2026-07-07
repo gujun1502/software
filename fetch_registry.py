@@ -111,10 +111,16 @@ def record_to_project(rec, src):
 
 
 # ---------------- 新点接口 ----------------
-def call_epoint(src, keyword="", pn=0, rn=20, timeout=20):
+def call_epoint(src, keyword="", pn=0, rn=20, timeout=20, days=0):
+    """days>0 时用接口自带的 sdt 起始日期过滤，只要最近 days 天发布的公告，
+    保证抓到的是新鲜商机（而不是全文检索翻出的陈年存档）。"""
     import requests
+    sdt = ""
+    if days and days > 0:
+        start = datetime.date.today() - datetime.timedelta(days=days)
+        sdt = f"{start.isoformat()} 00:00:00"
     param = {
-        "token": "", "pn": pn, "rn": rn, "sdt": "", "edt": "",
+        "token": "", "pn": pn, "rn": rn, "sdt": sdt, "edt": "",
         "wd": keyword, "inc_wd": "", "exc_wd": "", "fields": "title",
         "cnum": "001", "sort": '{"infodatepx":"0"}', "ssort": "title", "cl": 200,
         "terminal": "",
@@ -132,12 +138,12 @@ def call_epoint(src, keyword="", pn=0, rn=20, timeout=20):
     return r.json()
 
 
-def crawl_source(src, keywords, pages=2, rn=20):
+def crawl_source(src, keywords, pages=2, rn=20, days=0):
     items, seen = [], set()
     for kw in keywords:
         for pg in range(pages):
             try:
-                data = call_epoint(src, kw, pn=pg * rn, rn=rn)
+                data = call_epoint(src, kw, pn=pg * rn, rn=rn, days=days)
             except Exception as e:
                 print(f"   [{src['id']}] 关键词「{kw or '不限'}」第{pg+1}页失败：{str(e)[:90]}")
                 break
@@ -153,7 +159,38 @@ def crawl_source(src, keywords, pages=2, rn=20):
             print(f"   [{src['id']}] 「{kw or '不限'}」第{pg+1}页：返回{len(recs)} 新增{fresh}")
             if not recs:
                 break
+    # 个别源可能不支持 sdt 日期过滤(带上就全空)——整源为 0 时退回不限日期重抓一次，
+    # 老公告交给 run_radar 的时间窗剔除，保证不因兼容性丢掉一个源。
+    if days and not items:
+        print(f"   [{src['id']}] 日期过滤下 0 条，退回不限日期重抓 …")
+        return crawl_source(src, keywords, pages=pages, rn=rn, days=0)
     return items
+
+
+def crawl_all(days=7, pages=2, keywords=None):
+    """抓所有 verified 源最近 days 天的公告，写 data/reg_<id>_projects.json。
+    供 daily_job 每日调用；返回总条数。"""
+    keywords = keywords or KW.load()
+    reg = load_registry()
+    targets = [s for s in reg.get("sources", []) if s.get("status") == "verified"
+               and s.get("kind", "epoint") == "epoint"]
+    grand = 0
+    for s in targets:
+        print(f"· {s['name']}（{s['id']}）最近{days}天 …")
+        try:
+            items = crawl_source(s, keywords, pages=pages, days=days)
+        except Exception as e:
+            print(f"   [{s['id']}] 整源失败，跳过：{str(e)[:90]}")
+            continue
+        out = DATA / f"reg_{s['id']}_projects.json"
+        if not items:      # 抓 0 条多半是网络/VPN问题，别把上次的好数据覆盖成空
+            print(f"  → 0 条（疑似网络不通/VPN），保留旧文件 {out.name} 不覆盖")
+            continue
+        out.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        design = sum(1 for p in items if p["是否设计"])
+        grand += len(items)
+        print(f"  → {len(items)} 条（设计类 {design}）写入 {out.name}")
+    return grand
 
 
 def probe_source(src):
@@ -172,6 +209,7 @@ def main():
     ap = argparse.ArgumentParser(description="通用新点抓取器（注册表驱动）")
     ap.add_argument("--kw", nargs="*", default=None, help="关键词，默认 室内/装饰/装修/精装")
     ap.add_argument("--pages", type=int, default=2, help="每词翻页数（每页20）")
+    ap.add_argument("--days", type=int, default=7, help="只抓最近 N 天发布的公告（0=不限）")
     ap.add_argument("--only", default=None, help="只跑指定源 id")
     ap.add_argument("--probe", action="store_true", help="探测候选源，连通的自动升为 verified")
     ap.add_argument("--list", action="store_true", help="列出注册表")
@@ -210,14 +248,18 @@ def main():
                and s.get("kind", "epoint") == "epoint"]
     if args.only:
         targets = [s for s in sources if s["id"] == args.only]
-    print(f"=== 注册表抓取 {TODAY} ===  verified 源 {len(targets)} 个，关键词 {keywords}，每词{args.pages}页")
+    print(f"=== 注册表抓取 {TODAY} ===  verified 源 {len(targets)} 个，关键词 {keywords}，"
+          f"每词{args.pages}页，最近{args.days or '不限'}天")
     print("（提示：须在中国境内网络运行；抓不到的源自动跳过，不影响其他源）")
 
     grand = 0
     for s in targets:
         print(f"\n· {s['name']}（{s['id']}）{s.get('home','')}")
-        items = crawl_source(s, keywords, pages=args.pages)
+        items = crawl_source(s, keywords, pages=args.pages, days=args.days)
         out = DATA / f"reg_{s['id']}_projects.json"
+        if not items:      # 抓 0 条多半是网络/VPN问题，别把上次的好数据覆盖成空
+            print(f"  → 0 条（疑似网络不通/VPN），保留旧文件 {out.name} 不覆盖")
+            continue
         out.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
         design = sum(1 for p in items if p["是否设计"])
         grand += len(items)
