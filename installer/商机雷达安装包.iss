@@ -3,7 +3,7 @@
 ; 由 打包EXE.bat 先产出 dist\商机雷达.exe，再编译本脚本
 
 #define MyAppName "商机雷达"
-#define MyAppVersion "2026.07.08"
+#define MyAppVersion "2026.07.08.1"
 #define MyAppPublisher "上海同济建筑室内设计工程有限公司"
 #define MyAppExeName "商机雷达.exe"
 #define SrcRoot "C:\Users\Jun\OutBuildingDecision"
@@ -55,6 +55,10 @@ Source: "{#SrcRoot}\sources.json"; DestDir: "{app}"; Flags: onlyifdoesntexist un
 ; 初始数据：历史中标做决策参考；推送历史从空开始
 Source: "{#SrcRoot}\data\历史中标.json"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "{#SrcPkg}\data\推送历史.json"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
+; 打包当天的抓取数据快照：让新电脑装完第一次生成日报就有内容
+; （7天时间窗会自动过滤过旧条目；装完勾选"立即全量刷新"可拿到最新数据）
+Source: "{#SrcRoot}\data\*_projects.json"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "{#SrcRoot}\data\详情增强.json"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "{#SrcPkg}\inbox\把采招网邮件_html_放这里.txt"; DestDir: "{app}\inbox"; Flags: onlyifdoesntexist
 
 [Dirs]
@@ -74,5 +78,6 @@ Name: "{group}\日报文件夹"; Filename: "{app}\reports"
 Name: "{group}\使用说明"; Filename: "{app}\使用说明.txt"
 
 [Run]
+Filename: "{app}\2-更新数据并生成.bat"; Description: "立即全量刷新并生成第一份日报（联网抓取，约几分钟）"; Flags: postinstall skipifsilent
 Filename: "{app}\使用说明.txt"; Description: "查看使用说明"; Flags: postinstall shellexec skipifsilent
 Filename: "{app}\安装每日任务.bat"; Description: "现在注册每日自动任务（会询问运行时间）"; Flags: postinstall skipifsilent unchecked
