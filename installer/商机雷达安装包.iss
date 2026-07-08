@@ -3,7 +3,7 @@
 ; 由 打包EXE.bat 先产出 dist\商机雷达.exe，再编译本脚本
 
 #define MyAppName "商机雷达"
-#define MyAppVersion "2026.07.08.1"
+#define MyAppVersion "2026.07.08.2"
 #define MyAppPublisher "上海同济建筑室内设计工程有限公司"
 #define MyAppExeName "商机雷达.exe"
 #define SrcRoot "C:\Users\Jun\OutBuildingDecision"
@@ -68,6 +68,9 @@ Name: "{app}\reports"
 
 [Icons]
 Name: "{autodesktop}\商机雷达"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\radar.ico"; Comment: "生成商机日报并打开"; Tasks: desktopicon
+; 工具箱=直达安装文件夹（全量刷新/Cookie导出/注册每日任务等 bat 都在里面），
+; 不依赖 Win11 开始菜单「所有应用」——不熟的人在开始菜单找不到快捷方式
+Name: "{autodesktop}\商机雷达工具箱"; Filename: "{app}"; Comment: "更新数据、导出Cookie、注册每日任务、日报文件夹都在这里"; Tasks: desktopicon
 Name: "{group}\商机雷达 - 生成日报"; Filename: "{app}\1-生成日报.bat"; WorkingDir: "{app}"; IconFilename: "{app}\radar.ico"
 Name: "{group}\商机雷达 - 全量刷新并生成"; Filename: "{app}\2-更新数据并生成.bat"; WorkingDir: "{app}"; IconFilename: "{app}\radar.ico"
 Name: "{group}\导出采招网Cookie"; Filename: "{app}\3-导出采招网Cookie.bat"; WorkingDir: "{app}"
