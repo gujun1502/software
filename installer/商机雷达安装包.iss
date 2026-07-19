@@ -3,7 +3,7 @@
 ; 由 打包EXE.bat 先产出 dist\商机雷达.exe，再编译本脚本
 
 #define MyAppName "商机雷达"
-#define MyAppVersion "2026.07.08.2"
+#define MyAppVersion "2026.07.19.1"
 #define MyAppPublisher "上海同济建筑室内设计工程有限公司"
 #define MyAppExeName "商机雷达.exe"
 #define SrcRoot "C:\Users\Jun\OutBuildingDecision"
@@ -42,7 +42,10 @@ Source: "{#SrcPkg}\2-更新数据并生成.bat"; DestDir: "{app}"; Flags: ignore
 Source: "{#SrcPkg}\3-导出采招网Cookie.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcPkg}\4-导出上海平台Cookie.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcRoot}\_每日自动运行.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcRoot}\daily_run.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcRoot}\install_tasks.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcRoot}\安装每日任务.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcRoot}\取消每日任务.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcRoot}\安装本地大模型.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcPkg}\使用说明.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; 配置文件：首次安装写入，升级不覆盖用户已改内容，卸载保留
@@ -75,12 +78,17 @@ Name: "{group}\商机雷达 - 生成日报"; Filename: "{app}\1-生成日报.bat
 Name: "{group}\商机雷达 - 全量刷新并生成"; Filename: "{app}\2-更新数据并生成.bat"; WorkingDir: "{app}"; IconFilename: "{app}\radar.ico"
 Name: "{group}\导出采招网Cookie"; Filename: "{app}\3-导出采招网Cookie.bat"; WorkingDir: "{app}"
 Name: "{group}\导出上海平台Cookie"; Filename: "{app}\4-导出上海平台Cookie.bat"; WorkingDir: "{app}"
-Name: "{group}\注册每日自动任务"; Filename: "{app}\安装每日任务.bat"; WorkingDir: "{app}"
+Name: "{group}\重新注册工作日自动任务"; Filename: "{app}\安装每日任务.bat"; WorkingDir: "{app}"
+Name: "{group}\取消工作日自动任务"; Filename: "{app}\取消每日任务.bat"; WorkingDir: "{app}"
 Name: "{group}\安装本地大模型(可选)"; Filename: "{app}\安装本地大模型.bat"; WorkingDir: "{app}"
 Name: "{group}\日报文件夹"; Filename: "{app}\reports"
 Name: "{group}\使用说明"; Filename: "{app}\使用说明.txt"
 
 [Run]
+; 安装时自动注册工作日计划任务：周一至周五 09:00/09:15/09:30/09:45/10:00 各一趟，周六日不跑
+Filename: "{app}\安装每日任务.bat"; Parameters: "/auto"; StatusMsg: "正在注册工作日自动任务（周一至周五 9:00-10:00 五趟）..."; Flags: runhidden
 Filename: "{app}\2-更新数据并生成.bat"; Description: "立即全量刷新并生成第一份日报（联网抓取，约几分钟）"; Flags: postinstall skipifsilent
 Filename: "{app}\使用说明.txt"; Description: "查看使用说明"; Flags: postinstall shellexec skipifsilent
-Filename: "{app}\安装每日任务.bat"; Description: "现在注册每日自动任务（会询问运行时间）"; Flags: postinstall skipifsilent unchecked
+
+[UninstallRun]
+Filename: "{app}\取消每日任务.bat"; Parameters: "/auto"; Flags: runhidden; RunOnceId: "RemoveRadarTasks"
